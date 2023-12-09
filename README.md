@@ -11,7 +11,7 @@ The following instruction is written for Linux/macOS environment, though the cod
 
 ## Building instruction
 
-First, build the OpenIGTLink library. The detailed build instruction is available at (the OpenIGTLink library repository)[https://github.com/tokjun/OpenIGTLink/tree/test_rts_tdata/Examples/TrackingData]. The example code should work without any additional options. In a nutshell, 
+First, build the OpenIGTLink library. The detailed build instruction is available at [the OpenIGTLink library repository](https://github.com/tokjun/OpenIGTLink/tree/test_rts_tdata/Examples/TrackingData). The example code should work without any additional options. In a nutshell, 
 
 ~~~
 $ cd <working directory>
