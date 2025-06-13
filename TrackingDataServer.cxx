@@ -25,7 +25,7 @@
 
 
 void* ThreadFunction(void* ptr);
-int   SendTrackingData(igtl::Socket::Pointer& socket, igtl::TrackingDataMessage::Pointer& trackingMsg);
+int   SendTrackingData(igtl::Socket::Pointer& socket, igtl::TrackingDataMessage::Pointer& trackingMsg, int mode);
 void  GetRandomTestMatrix(igtl::Matrix4x4& matrix, float phi, float theta);
 
 typedef struct {
@@ -181,6 +181,11 @@ void* ThreadFunction(void* ptr)
   // Get user data
   igtl::MutexLock::Pointer glock = td->glock;
   long interval = td->interval;
+  if (interval < 1)
+    {
+    std::cerr << "Interval is too small. Use 10 ms instead." << std::endl;
+    interval = 10;
+    }
   std::cerr << "Interval = " << interval << " (ms)" << std::endl;
   //long interval = 1000;
   //long interval = (id + 1) * 100; // (ms)
@@ -200,32 +205,68 @@ void* ThreadFunction(void* ptr)
 
   igtl::TrackingDataElement::Pointer trackElement0;
   trackElement0 = igtl::TrackingDataElement::New();
-  trackElement0->SetName("Channel 0");
+  trackElement0->SetName("Ref");
   trackElement0->SetType(igtl::TrackingDataElement::TYPE_TRACKER);
 
   igtl::TrackingDataElement::Pointer trackElement1;
   trackElement1 = igtl::TrackingDataElement::New();
-  trackElement1->SetName("Channel 1");
-  trackElement1->SetType(igtl::TrackingDataElement::TYPE_6D);
+  trackElement1->SetName("i1");
+  trackElement1->SetType(igtl::TrackingDataElement::TYPE_TRACKER);
 
   igtl::TrackingDataElement::Pointer trackElement2;
   trackElement2 = igtl::TrackingDataElement::New();
-  trackElement2->SetName("Channel 2");
-  trackElement2->SetType(igtl::TrackingDataElement::TYPE_5D);
+  trackElement2->SetName("i2");
+  trackElement2->SetType(igtl::TrackingDataElement::TYPE_TRACKER);
 
   trackingMsg->AddTrackingDataElement(trackElement0);
-  trackingMsg->AddTrackingDataElement(trackElement1);
-  trackingMsg->AddTrackingDataElement(trackElement2);
+  //trackingMsg->AddTrackingDataElement(trackElement1);
+  //trackingMsg->AddTrackingDataElement(trackElement2);
 
   //------------------------------------------------------------
   // Loop
+  int mode = 0;
+  std::cerr << "Mode = 0 (Reference only)" << std::endl;
+  int counter = 0;
+  int prevMode = 0;
+
   while (!td->stop)
     {
     trackingMsg->SetDeviceName("Tracker");
     glock->Lock();
-    SendTrackingData(socket, trackingMsg);
+    if (counter >= 1000 && counter <2000) // 10 sec
+      {
+      mode = 1;
+      if (mode != prevMode)
+        {
+        std::cerr << "Mode = 1 (Reference and instrument 0)" << std::endl;
+        prevMode = mode;
+        }
+      if (trackingMsg->GetNumberOfTrackingDataElements() != 2)
+        {
+        trackingMsg->ClearTrackingDataElements();
+        trackingMsg->AddTrackingDataElement(trackElement0);
+        trackingMsg->AddTrackingDataElement(trackElement1);
+        }
+      }
+    else if (counter >= 2000) // 20 sec
+      {
+      mode = 2;
+      if (mode != prevMode)
+        {
+        std::cerr << "Mode = 2 (Reference and instrument 1)" << std::endl;
+        prevMode = mode;
+        }
+      if (trackingMsg->GetNumberOfTrackingDataElements() != 2)
+        {
+        trackingMsg->ClearTrackingDataElements();
+        trackingMsg->AddTrackingDataElement(trackElement0);
+        trackingMsg->AddTrackingDataElement(trackElement1);
+        }
+      }
+    SendTrackingData(socket, trackingMsg, mode);
     glock->Unlock();
     igtl::Sleep(interval);
+    counter ++;
     }
 
   //glock->Lock();
@@ -244,7 +285,7 @@ void* ThreadFunction(void* ptr)
 }
 
 
-int SendTrackingData(igtl::Socket::Pointer& socket, igtl::TrackingDataMessage::Pointer& trackingMsg)
+int SendTrackingData(igtl::Socket::Pointer& socket, igtl::TrackingDataMessage::Pointer& trackingMsg, int mode)
 {
 
   static float phi0   = 0.0;
@@ -257,20 +298,42 @@ int SendTrackingData(igtl::Socket::Pointer& socket, igtl::TrackingDataMessage::P
   igtl::Matrix4x4 matrix;
   igtl::TrackingDataElement::Pointer ptr;
 
-  // Channel 0
-  trackingMsg->GetTrackingDataElement(0, ptr);
-  GetRandomTestMatrix(matrix, phi0, theta0);
-  ptr->SetMatrix(matrix);
-  
-  // Channel 1
-  trackingMsg->GetTrackingDataElement(1, ptr);
-  GetRandomTestMatrix(matrix, phi1, theta1);
-  ptr->SetMatrix(matrix);
-  
-  // Channel 2
-  trackingMsg->GetTrackingDataElement(2, ptr);
-  GetRandomTestMatrix(matrix, phi2, theta2);
-  ptr->SetMatrix(matrix);
+  if (mode == 0)
+    {
+    // Channel 0
+    trackingMsg->GetTrackingDataElement(0, ptr);
+    GetRandomTestMatrix(matrix, phi0, theta0);
+    ptr->SetName("Ref");
+    ptr->SetMatrix(matrix);
+    }
+  else if (mode == 1)
+    {
+    // Channel 0
+    trackingMsg->GetTrackingDataElement(0, ptr);
+    GetRandomTestMatrix(matrix, phi0, theta0);
+    ptr->SetName("Ref");
+    ptr->SetMatrix(matrix);
+
+    // Channel 1
+    trackingMsg->GetTrackingDataElement(1, ptr);
+    GetRandomTestMatrix(matrix, phi1, theta1);
+    ptr->SetName("i1");
+    ptr->SetMatrix(matrix);
+    }
+  else if (mode == 2)
+    {
+    // Channel 0
+    trackingMsg->GetTrackingDataElement(0, ptr);
+    GetRandomTestMatrix(matrix, phi0, theta0);
+    ptr->SetName("Ref");
+    ptr->SetMatrix(matrix);
+
+    // Channel 1
+    trackingMsg->GetTrackingDataElement(1, ptr);
+    GetRandomTestMatrix(matrix, phi1, theta1);
+    ptr->SetName("i2");
+    ptr->SetMatrix(matrix);
+    }
 
   trackingMsg->Pack();
   socket->Send(trackingMsg->GetPackPointer(), trackingMsg->GetPackSize());
