@@ -28,6 +28,9 @@ void* ThreadFunction(void* ptr);
 int   SendTrackingData(igtl::Socket::Pointer& socket, igtl::TrackingDataMessage::Pointer& trackingMsg, int mode);
 void  GetRandomTestMatrix(igtl::Matrix4x4& matrix, float phi, float theta);
 
+std::string tdataMsgName;
+std::vector<std::string> elemNames;
+
 typedef struct {
   int   nloop;
   igtl::MutexLock::Pointer glock;
@@ -43,13 +46,30 @@ int main(int argc, char* argv[])
   //------------------------------------------------------------
   // Parse Arguments
 
-  if (argc != 2) // check number of arguments
+  if (argc != 2 && argc != 3) // check number of arguments
     {
     // If not correct, print usage
-    std::cerr << "Usage: " << argv[0] << " <port>"    << std::endl;
+    std::cerr << "Usage: " << argv[0] << " <port> <msgname>"    << std::endl;
     std::cerr << "    <port>     : Port # (18944 in Slicer default)"   << std::endl;
+    std::cerr << "    <msgname>  : TDATA message name" << std::endl;
     exit(0);
     }
+
+  tdataMsgName = "";
+  if (argc == 3)
+    {
+    tdataMsgName = argv[2];
+    }
+  elemNames.resize(3);
+  elemNames[0] = "Reference";
+  elemNames[1] = "Pointer";
+  elemNames[2] = "InstruementM";
+
+  std::cerr << "Message: " << std::endl;
+  std::cerr << "  Message Name: " << tdataMsgName << std::endl;
+  std::cerr << "  Elemenet 0 Name: " << elemNames[0] << std::endl;
+  std::cerr << "  Elemenet 1 Name: " << elemNames[1] << std::endl;
+  std::cerr << "  Elemenet 2 Name: " << elemNames[2] << std::endl;
 
   int    port     = atoi(argv[1]);
 
@@ -205,17 +225,17 @@ void* ThreadFunction(void* ptr)
 
   igtl::TrackingDataElement::Pointer trackElement0;
   trackElement0 = igtl::TrackingDataElement::New();
-  trackElement0->SetName("Ref");
+  trackElement0->SetName(elemNames[0].c_str());
   trackElement0->SetType(igtl::TrackingDataElement::TYPE_TRACKER);
 
   igtl::TrackingDataElement::Pointer trackElement1;
   trackElement1 = igtl::TrackingDataElement::New();
-  trackElement1->SetName("i1");
+  trackElement1->SetName(elemNames[1].c_str());
   trackElement1->SetType(igtl::TrackingDataElement::TYPE_TRACKER);
 
   igtl::TrackingDataElement::Pointer trackElement2;
   trackElement2 = igtl::TrackingDataElement::New();
-  trackElement2->SetName("i2");
+  trackElement2->SetName(elemNames[2].c_str());
   trackElement2->SetType(igtl::TrackingDataElement::TYPE_TRACKER);
 
   trackingMsg->AddTrackingDataElement(trackElement0);
@@ -231,7 +251,7 @@ void* ThreadFunction(void* ptr)
 
   while (!td->stop)
     {
-    trackingMsg->SetDeviceName("Tracker");
+    trackingMsg->SetDeviceName(tdataMsgName.c_str());
     glock->Lock();
     if (counter >= 1000 && counter <2000) // 10 sec
       {
@@ -248,7 +268,7 @@ void* ThreadFunction(void* ptr)
         trackingMsg->AddTrackingDataElement(trackElement1);
         }
       }
-    else if (counter >= 2000) // 20 sec
+    else if (counter >= 2000 && counter < 3000) // 20 sec
       {
       mode = 2;
       if (mode != prevMode)
@@ -260,7 +280,23 @@ void* ThreadFunction(void* ptr)
         {
         trackingMsg->ClearTrackingDataElements();
         trackingMsg->AddTrackingDataElement(trackElement0);
+        trackingMsg->AddTrackingDataElement(trackElement2);
+        }
+      }
+    else if (counter >= 3000) // 20 sec
+      {
+      mode = 3;
+      if (mode != prevMode)
+        {
+        std::cerr << "Mode = 3 (Reference, instrument 1, and instrument 2)" << std::endl;
+        prevMode = mode;
+        }
+      if (trackingMsg->GetNumberOfTrackingDataElements() != 3)
+        {
+        trackingMsg->ClearTrackingDataElements();
+        trackingMsg->AddTrackingDataElement(trackElement0);
         trackingMsg->AddTrackingDataElement(trackElement1);
+        trackingMsg->AddTrackingDataElement(trackElement2);
         }
       }
     SendTrackingData(socket, trackingMsg, mode);
@@ -303,7 +339,7 @@ int SendTrackingData(igtl::Socket::Pointer& socket, igtl::TrackingDataMessage::P
     // Channel 0
     trackingMsg->GetTrackingDataElement(0, ptr);
     GetRandomTestMatrix(matrix, phi0, theta0);
-    ptr->SetName("Ref");
+    ptr->SetName(elemNames[0].c_str());
     ptr->SetMatrix(matrix);
     }
   else if (mode == 1)
@@ -311,13 +347,13 @@ int SendTrackingData(igtl::Socket::Pointer& socket, igtl::TrackingDataMessage::P
     // Channel 0
     trackingMsg->GetTrackingDataElement(0, ptr);
     GetRandomTestMatrix(matrix, phi0, theta0);
-    ptr->SetName("Ref");
+    ptr->SetName(elemNames[0].c_str());
     ptr->SetMatrix(matrix);
 
     // Channel 1
     trackingMsg->GetTrackingDataElement(1, ptr);
     GetRandomTestMatrix(matrix, phi1, theta1);
-    ptr->SetName("i1");
+    ptr->SetName(elemNames[1].c_str());
     ptr->SetMatrix(matrix);
     }
   else if (mode == 2)
@@ -325,15 +361,36 @@ int SendTrackingData(igtl::Socket::Pointer& socket, igtl::TrackingDataMessage::P
     // Channel 0
     trackingMsg->GetTrackingDataElement(0, ptr);
     GetRandomTestMatrix(matrix, phi0, theta0);
-    ptr->SetName("Ref");
+    ptr->SetName(elemNames[0].c_str());
     ptr->SetMatrix(matrix);
 
     // Channel 1
     trackingMsg->GetTrackingDataElement(1, ptr);
     GetRandomTestMatrix(matrix, phi1, theta1);
-    ptr->SetName("i2");
+    ptr->SetName(elemNames[2].c_str());
     ptr->SetMatrix(matrix);
     }
+  else if (mode == 3)
+    {
+    // Channel 0
+    trackingMsg->GetTrackingDataElement(0, ptr);
+    GetRandomTestMatrix(matrix, phi0, theta0);
+    ptr->SetName(elemNames[0].c_str());
+    ptr->SetMatrix(matrix);
+
+    // Channel 1
+    trackingMsg->GetTrackingDataElement(1, ptr);
+    GetRandomTestMatrix(matrix, phi1, theta1);
+    ptr->SetName(elemNames[1].c_str());
+    ptr->SetMatrix(matrix);
+
+    // Channel 2
+    trackingMsg->GetTrackingDataElement(2, ptr);
+    GetRandomTestMatrix(matrix, phi2, theta2);
+    ptr->SetName(elemNames[2].c_str());
+    ptr->SetMatrix(matrix);
+    }
+
 
   trackingMsg->Pack();
   socket->Send(trackingMsg->GetPackPointer(), trackingMsg->GetPackSize());

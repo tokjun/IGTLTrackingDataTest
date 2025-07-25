@@ -56,6 +56,9 @@ int main(int argc, char* argv[])
     exit(0);
     }
 
+
+  igtl::Sleep(5000);
+
   //------------------------------------------------------------
   // Ask the server to start pushing tracking data
   std::cerr << "Sending STT_TDATA message....." << std::endl; 
@@ -101,7 +104,7 @@ int main(int argc, char* argv[])
       std::cerr << "Receiving : " << headerMsg->GetDeviceType() << std::endl;
       socket->Skip(headerMsg->GetBodySizeToRead(), 0);
       }
-    if (++loop >= 10) // if received 100 times
+    if (++loop >= 100) // if received 100 times
       {
       //------------------------------------------------------------
       // Ask the server to stop pushing tracking data
